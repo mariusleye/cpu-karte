@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#033861">
+<title>CPU-Karte</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-48.png" type="image/png" sizes="48x48">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo"><img src="icons/medape-logo-256.png" alt="MedApe" width="52" height="52"></span>
+    <div>
+      <h1>CPU-Karte</h1>
+      <div class="untertitel">Alternativen zur Uniklinik Heidelberg</div>
+    </div>
+  </div>
+  <div class="topbar-rechts">
+    <span class="stand" id="standAnzeige" aria-live="polite"></span>
+    <button type="button" class="link" id="infoKnopf">Info und Datenschutz</button>
+  </div>
+</header>
+
+<div class="hinweisband" role="note">
+  <b>Entscheidungshilfe nach hinterlegter Klinikliste, keine Empfehlung.</b> Klinische Entscheidung und Zuweisung liegen
+  beim Notarzt und bei der Leitstelle. Fahrzeiten sind Richtwerte für Pkw. Freie Kapazitäten bitte immer telefonisch erfragen.
+</div>
+
+<div class="meldungen" id="meldungen" aria-live="polite"></div>
+
+<main class="raster">
+  <section class="seite" aria-label="Eingabe und Ergebnis">
+    <form id="standortForm" class="block" autocomplete="off">
+      <label for="standort">1. Standort des Rettungsdienstes</label>
+      <div class="zeile">
+        <input id="standort" type="text" inputmode="text" placeholder="Straße, Ort oder A5 Walldorf" spellcheck="false">
+        <button type="submit" id="suchenKnopf">Suchen</button>
+      </div>
+      <p class="klein">Hausnummern werden nie übertragen. Oder einen Punkt auf der Karte anklicken.</p>
+      <div id="trefferListe" class="trefferliste" role="listbox" aria-label="Treffer"></div>
+      <div id="standortAnzeige" class="standortanzeige" aria-live="polite"></div>
+    </form>
+
+    <div class="block">
+      <div class="beschriftung" id="profilLabel">2. Fallprofil</div>
+      <div id="profile" class="profile" role="radiogroup" aria-labelledby="profilLabel"></div>
+    </div>
+
+    <details class="block einstellungen">
+      <summary>Einstellungen und Klinikliste</summary>
+      <div class="einstellung">
+        <label for="schwelle">Mehrzeit gegenüber UKHD bis (Minuten)</label>
+        <input id="schwelle" type="number" min="0" max="60" step="1" value="10">
+      </div>
+      <div class="einstellung">
+        <label for="uhrzeit">Uhrzeit für die Katheter-Zeitfenster</label>
+        <div class="zeile">
+          <input id="uhrzeit" type="datetime-local">
+          <button type="button" id="uhrzeitJetzt">Jetzt</button>
+        </div>
+        <p class="klein" id="uhrzeitHinweis"></p>
+      </div>
+      <div class="einstellung">
+        <label for="listeDatei">Eigene Klinikliste laden (.xlsx oder .csv)</label>
+        <input id="listeDatei" type="file" accept=".xlsx,.csv">
+        <p class="klein" id="listeHinweis"></p>
+        <button type="button" id="standardListe" hidden>Standardliste wiederherstellen</button>
+      </div>
+    </details>
+
+    <section class="block" aria-live="polite">
+      <div class="beschriftung">3. Ergebnis</div>
+      <div id="ergebnis" class="ergebnis"></div>
+    </section>
+  </section>
+
+  <section class="kartenspalte" aria-label="Karte">
+    <div id="karte"></div>
+    <button type="button" class="kartenknopf hell" id="routenKnopf" aria-pressed="false">
+      <span class="schalter" aria-hidden="true"></span> Routen auf der Karte
+    </button>
+    <div class="legende">
+      <span><i class="punkt referenz">H</i> UKHD</span>
+      <span><i class="punkt alternative">1</i> geeignet und nah</span>
+      <span><i class="punkt weit"></i> geeignet, zu weit</span>
+      <span><i class="punkt aus"></i> nicht geeignet oder unbekannt</span>
+      <span id="legendeRouten" hidden><i class="linie hd"></i> Route UKHD <i class="linie"></i> Route Alternative</span>
+    </div>
+  </section>
+</main>
+
+<dialog id="infoDialog">
+  <h2>Info und Datenschutz</h2>
+  <div id="infoText"></div>
+  <form method="dialog"><button>Schließen</button></form>
+</dialog>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="logic.js"></script>
+<script src="xlsx-lesen.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

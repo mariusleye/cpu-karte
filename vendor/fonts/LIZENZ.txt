@@ -1,0 +1,3 @@
+Hanken Grotesk, Copyright 2022 The Hanken Grotesk Project Authors (https://github.com/marcologous/hanken-grotesk).
+Lizenz: SIL Open Font License, Version 1.1 (https://openfontlicense.org).
+Die Datei HankenGrotesk-latin.woff2 ist der Latin-Schnitt der variablen Schrift, so von Google Fonts ausgeliefert.

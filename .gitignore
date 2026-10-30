@@ -1,0 +1,8 @@
+# Zwischenstände und Entwürfe, nicht veröffentlichen
+data/ov-*.json
+data/kliniken-entwurf.json
+*.tmp
+~$*
+
+# Originale der Logos (die verkleinerten Fassungen liegen in icons/)
+MedApe Logo Karte Richtigen*.png
