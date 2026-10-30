@@ -6,7 +6,7 @@
  * immer die aktuelle; offline gilt der zuletzt geladene Stand (die App zeigt dessen Datum).
  * Bei einer neuen Version die Zahl VERSION erhöhen.
  */
-var VERSION = "cpu-karte-0.2.0";
+var VERSION = "cpu-karte-0.2.1";
 var HUELLE = [
   "./", "index.html", "app.css", "app.js", "logic.js", "xlsx-lesen.js",
   "manifest.webmanifest", "icons/medape-logo-256.png", "icons/icon-192.png", "icons/icon-512.png",

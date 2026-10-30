@@ -3,7 +3,7 @@
   "use strict";
 
   var C = window.CPU;
-  var APP_VERSION = "0.2.0";
+  var APP_VERSION = "0.2.1";
   var HD_ID = "ukhd";
   var HD_RADIUS_KM = 130;
   var OSRM = "https://router.project-osrm.org";
@@ -627,9 +627,10 @@
         });
       });
     }).catch(function () { /* ohne Service Worker läuft die App weiter, nur ohne Offline-Hülle */ });
-    var neuGeladen = false;
+    var neuGeladen = false, hatteController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener("controllerchange", function () {
-      if (neuGeladen) return;
+      // Erstbesuch: der Service Worker übernimmt nur die Seite, ein Neuladen würde Eingaben verwerfen
+      if (neuGeladen || !hatteController) return;
       neuGeladen = true;
       location.reload();
     });
