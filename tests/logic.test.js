@@ -211,4 +211,32 @@ t("Schätzung aus Luftlinie", () => {
   assert.ok(m > 15 && m < 40);
 });
 
+// ---- Lückenanalyse
+t("Lückenanalyse zählt unbekannte Felder und blockierte Profile", () => {
+  const voll = C.normalisiereKlinik({ id: "v", name: "V", lat: 49, lon: 8, katheter: "24/7", stand: "2026-10-01", geprueft: "Dr. X",
+    notaufnahme: "ja", cpu: "ja", intensiv: "ja", beatmung: "ja", herzchirurgie: "ja", ecmo_impella: "ja", ttm: "ja", ep: "ja", lyse: "ja", ct: "ja", schrittmacher_temp: "ja" });
+  const luecke = C.normalisiereKlinik({ id: "l", name: "L", lat: 49, lon: 8, katheter: "24/7", intensiv: "ja", notaufnahme: "ja", cpu: "ja", ttm: "" });
+  const nein = C.normalisiereKlinik({ id: "n", name: "N", lat: 49, lon: 8, katheter: "nein", intensiv: "ja", ttm: "" });
+  const r = C.luecken([voll, luecke, nein], d("2026-10-30T12:00:00"));
+  assert.equal(r.haeuser[0].fehlend.length, 0);
+  assert.equal(r.haeuser[0].geprueft, true);
+  assert.equal(r.haeuser[0].tage, 29);
+  assert.equal(r.zusammenfassung.mitLuecken, 2);
+  assert.equal(r.zusammenfassung.geprueft, 1);
+  assert.equal(r.proFeld.ttm, 2);
+  // ROSC braucht Katheter rund um die Uhr, Intensiv und TTM: bei L fehlt nur TTM, die Lücke allein blockiert
+  assert.ok(r.haeuser[1].blockiert.includes("rosc"));
+  // bei N ist der fehlende Katheter ein klares Nein, kein Lückenproblem
+  assert.ok(!r.haeuser[2].blockiert.includes("rosc"));
+  assert.equal(r.haeuser[2].zellen[0].status, "nein");
+  assert.equal(r.proProfil.rosc, 1);
+});
+
+t("Lückenanalyse: unlesbare Katheterzeit ist unbekannt", () => {
+  const k = C.normalisiereKlinik({ id: "x", name: "X", lat: 49, lon: 8, katheter: "werktags" });
+  const r = C.luecken([k], d("2026-10-30T12:00:00"));
+  assert.equal(r.haeuser[0].zellen[0].status, "unbekannt");
+  assert.match(r.haeuser[0].zellen[0].text, /nicht lesbar/);
+});
+
 console.log("\n" + n + " Tests bestanden");

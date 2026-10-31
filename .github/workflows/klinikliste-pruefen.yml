@@ -1,0 +1,60 @@
+# Monatliche Pflegeprüfung der Klinikliste: Format, Alter der Angaben, Erreichbarkeit der Quellseiten.
+# Bei Befund legt die Action ein Issue an (GitHub schickt dann die übliche Benachrichtigung),
+# bei erneutem Lauf wird dasselbe Issue aktualisiert, und sobald alles in Ordnung ist, wird es geschlossen.
+# Es werden keine Zugangsdaten und keine Patientendaten verwendet; geprüft werden nur öffentliche Adressen.
+name: Klinikliste prüfen
+
+on:
+  schedule:
+    - cron: "17 5 1 * *"   # am Monatsersten, 05:17 UTC
+  workflow_dispatch: {}      # von Hand startbar: Reiter Actions, Klinikliste prüfen, Run workflow
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: klinikliste-pruefen
+  cancel-in-progress: false
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Logik-Tests
+        run: node tests/logic.test.js
+
+      - name: Pflegebericht erzeugen
+        id: bericht
+        run: node tools/pflegebericht.js --ausgabe pflegebericht.md
+
+      - name: Issue anlegen, aktualisieren oder schließen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFUND: ${{ steps.bericht.outputs.befund }}
+          TITEL: ${{ steps.bericht.outputs.titel }}
+        run: |
+          gh label create listenpflege --description "Monatliche Prüfung der Klinikliste" --color F6801E --force
+          NUMMER=$(gh issue list --label listenpflege --state open --json number --jq '.[0].number // empty')
+          if [ "$BEFUND" = "true" ]; then
+            if [ -n "$NUMMER" ]; then
+              gh issue edit "$NUMMER" --title "$TITEL" --body-file pflegebericht.md
+              gh issue comment "$NUMMER" --body "Neuer Lauf: Befund besteht weiter oder hat sich geändert, Bericht oben aktualisiert."
+            else
+              gh issue create --label listenpflege --title "$TITEL" --body-file pflegebericht.md
+            fi
+          elif [ -n "$NUMMER" ]; then
+            gh issue close "$NUMMER" --comment "Neuer Lauf ohne Befund, Meldung geschlossen."
+          fi
+
+      - name: Bericht in der Zusammenfassung zeigen
+        if: always()
+        run: |
+          if [ -f pflegebericht.md ]; then cat pflegebericht.md >> "$GITHUB_STEP_SUMMARY"; fi

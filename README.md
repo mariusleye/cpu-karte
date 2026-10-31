@@ -44,6 +44,27 @@ heißt in den Details „Nicht ärztlich geprüft". Nach 90 Tagen warnt die App 
 Die Zuordnung Profil zu nötigen Fähigkeiten steht in `logic.js` (`PROFILE`). Sie ist ein Entwurf und
 klinisch abzunehmen.
 
+## Listenprüfung (Lücken sehen)
+
+Der Reiter **Listenprüfung** (oben, mit gelber Zahl der Häuser mit Lücken) ist für die fachliche Abnahme und die
+Planung von Rückfragen gedacht. Er zeigt je Haus ✓ ja, ✗ nein oder ? unbekannt für alle Angaben, dazu Alter des
+Stands, „Geprüft von“, Quellen (anklickbar) und Hinweis. Die Balken „Wo sich eine Rückfrage lohnt“ nennen je
+Fallprofil, wie viele Häuser nur wegen unbekannter Angaben ausfallen; ein Klick filtert die Tabelle. Ein Klick
+auf eine Spaltenüberschrift zeigt nur Häuser, bei denen dieses Feld fehlt. „Rückfrageliste kopieren“ erzeugt
+einen Text mit den offenen Angaben je Haus für die telefonische Klärung. Die Ansicht speichert und ändert
+nichts; Korrekturen kommen wie gewohnt in die Pflege-Excel. Direktlink: `…/cpu-karte/#pruefung`.
+
+## Automatische Pflegeprüfung
+
+Die GitHub Action `Klinikliste prüfen` (`.github/workflows/klinikliste-pruefen.yml`) läuft am Monatsersten und
+lässt sich im Reiter Actions von Hand starten. Sie führt die Logik-Tests aus und erzeugt mit
+`tools/pflegebericht.js` einen Bericht: formale Fehler der Liste, Angaben mit Stand älter als 90 Tage und
+Quellseiten, die nicht mehr existieren (HTTP 404/410 oder Adresse nicht auflösbar). Seiten, die nur den Zugriff
+sperren oder nicht antworten, stehen als „nicht eindeutig prüfbar“ im Bericht, ohne Befund. Bei Befund legt die
+Action ein Issue mit dem Label `listenpflege` an (GitHub benachrichtigt wie üblich), aktualisiert es bei den
+nächsten Läufen und schließt es, sobald alles in Ordnung ist. Lücken und fehlende ärztliche Prüfung stehen nur
+zur Information im Bericht. Lokal: `node tools/pflegebericht.js` (mit `--ohne-netz` ohne Quellenprüfung).
+
 ## Datenschutz-Kurzbeschreibung
 
 | Dienst | Was dorthin geht | Was nicht |
@@ -54,7 +75,7 @@ klinisch abzunehmen.
 | OpenStreetMap-Kacheln | der sichtbare Kartenausschnitt | nichts weiter |
 
 Gespeichert wird nichts über Einsätze: Standort, Profil und Eingaben bleiben im Arbeitsspeicher. Im Browser
-liegt höchstens eine selbst geladene Klinikliste. Keine Cookies, keine Statistik, keine Schlüssel. Die
+liegen höchstens die Wahl hell oder dunkel und eine selbst geladene Klinikliste. Keine Cookies, keine Statistik, keine Schlüssel. Die
 Content-Security-Policy in `index.html` beschränkt Verbindungen auf diese drei Dienste.
 
 Ein Klick auf die Karte setzt den Standort ohne jede Adresssuche; nur Koordinaten gehen an OSRM.
@@ -71,7 +92,7 @@ Ein Klick auf die Karte setzt den Standort ohne jede Adresssuche; nur Koordinate
 
 ## Technik
 
-Statische Seite ohne Server: `index.html`, `app.js` (Oberfläche), `logic.js` (Eignung, Zeitfenster,
+Statische Seite ohne Server: `index.html`, `app.js` (Oberfläche), `pruefung.js` (Listenprüfung), `theme.js` (hell/dunkel), `logic.js` (Eignung, Zeitfenster,
 Feiertage BW, Adressbereinigung; ohne Browser getestet), `xlsx-lesen.js` (Excel im Browser lesen),
 `sw.js` und `manifest.webmanifest` (installierbare App), `vendor/leaflet` (Karte, BSD-2),
 `vendor/fonts` (Hanken Grotesk, SIL OFL, lokal eingebunden), `icons` (MedApe-Logo),

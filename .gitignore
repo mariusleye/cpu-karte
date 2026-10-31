@@ -6,3 +6,6 @@ data/kliniken-entwurf.json
 
 # Originale der Logos (die verkleinerten Fassungen liegen in icons/)
 MedApe Logo Karte Richtigen*.png
+
+# Lokal erzeugter Pflegebericht
+pflegebericht*.md

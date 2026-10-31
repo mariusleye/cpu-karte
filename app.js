@@ -3,7 +3,7 @@
   "use strict";
 
   var C = window.CPU;
-  var APP_VERSION = "0.2.1";
+  var APP_VERSION = "0.3.0";
   var HD_ID = "ukhd";
   var HD_RADIUS_KM = 130;
   var OSRM = "https://router.project-osrm.org";
@@ -26,7 +26,8 @@
     ausgewaehlt: null,
     anfrage: 0,
     routen: false,
-    routenToken: 0
+    routenToken: 0,
+    ansicht: "karte"
   };
   var routenCache = {};
 
@@ -55,6 +56,8 @@
   }
 
   function leere(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+  window.CPUDom = { h: h, leere: leere };
 
   function datumDe(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
@@ -132,6 +135,36 @@
       ? "Geladen aus " + name + ", nur in diesem Browser gespeichert."
       : "Standardliste aus der App (" + liste.length + " Häuser).";
     $("standardListe").hidden = quelle !== "lokal";
+    aktualisiereLueckenZaehler();
+    if (state.ansicht === "pruefung") zeichnePruefung();
+  }
+
+  function aktualisiereLueckenZaehler() {
+    var n = Pruefung.anzahlMitLuecken(state.kliniken, jetzt());
+    var z = $("lueckenZaehler");
+    z.hidden = !n;
+    z.textContent = String(n);
+    z.title = n + (n === 1 ? " Haus hat" : " Häuser haben") + " unbekannte Angaben";
+  }
+
+  // ---------------------------------------------------------------- Ansichten
+
+  function zeichnePruefung() {
+    Pruefung.render($("ansichtPruefung"), state.kliniken, { jetzt: jetzt(), hd: hdKlinik() });
+  }
+
+  function zeigeAnsicht(name, hashSetzen) {
+    state.ansicht = name === "pruefung" ? "pruefung" : "karte";
+    var pruef = state.ansicht === "pruefung";
+    $("ansichtKarte").hidden = pruef;
+    $("ansichtPruefung").hidden = !pruef;
+    $("navKarte").setAttribute("aria-current", pruef ? "false" : "page");
+    $("navPruefung").setAttribute("aria-current", pruef ? "page" : "false");
+    if (hashSetzen && history.replaceState) {
+      history.replaceState(null, "", pruef ? "#pruefung" : location.pathname + location.search);
+    }
+    if (pruef) zeichnePruefung();
+    else if (map) setTimeout(function () { map.invalidateSize(); }, 0);
   }
 
   function dateiGewaehlt(file) {
@@ -333,7 +366,8 @@
     if (!state.routen || !state.standort || !ziele) return;
     var von = [state.standort.lat, state.standort.lon];
     ziele.forEach(function (z) {
-      var k = z.klinik, farbe = z.referenz ? "#033861" : "#1a7f4b", gewaehlt = state.ausgewaehlt === k.id;
+      var dunkel = window.CPUTheme && window.CPUTheme.aktuell() === "dunkel";
+      var k = z.klinik, farbe = z.referenz ? (dunkel ? "#7CC4F5" : "#033861") : (dunkel ? "#4ADE80" : "#1a7f4b"), gewaehlt = state.ausgewaehlt === k.id;
       holeRoute(k).then(function (r) {
         if (token !== state.routenToken) return;
         var stil = { color: farbe, weight: gewaehlt ? 8 : 5, opacity: gewaehlt ? .95 : .7 };
@@ -370,7 +404,21 @@
 
   function jetzt() { return state.jetztOverride || new Date(); }
 
-  function ergebnisKarte(e, rang) {
+  // Fahrzeitbalken: Länge = Fahrzeit im Verhältnis zur längsten angezeigten, Strich = Fahrzeit nach UKHD.
+  function fahrzeitBalken(e, skala, hdMin) {
+    if (e.minuten === null || !skala) return null;
+    var fuell = h("i", { class: "fuell" });
+    fuell.style.width = Math.max(4, Math.min(100, e.minuten / skala * 100)) + "%";
+    var balken = h("div", { class: "balken", "aria-hidden": "true" }, fuell);
+    if (!e.referenz && hdMin !== null) {
+      var strich = h("u", { class: "hdstrich", title: "Fahrzeit nach UKHD" });
+      strich.style.left = Math.min(100, hdMin / skala * 100) + "%";
+      balken.appendChild(strich);
+    }
+    return balken;
+  }
+
+  function ergebnisKarte(e, rang, skala, hdMin, nr) {
     var k = e.klinik, kat = e.kategorie;
     var istSchaetzung = state.minutenQuelle === "schaetzung";
     var zahlen = [];
@@ -405,13 +453,34 @@
       h("div", { class: "name" }, (kat === "alternative" ? rang + ". " : "") + k.name),
       h("div", { class: "ort" }, k.ort + (e.referenz ? " · Vergleichsziel" : "") + (k.uni && !e.referenz ? " · Universitätsklinikum" : "")),
       h("div", { class: "zahlen" }, zahlen),
+      fahrzeitBalken(e, skala, hdMin),
       e.referenz ? h("div", { class: "alles" }, "Kann alle Profile jederzeit aufnehmen") : h("div", { class: "marken" }, marken),
       h("details", null,
         h("summary", null, kat === "nicht_geeignet" ? "Warum nicht geeignet" : "Details"),
         h("ul", null, gruende),
         h("p", { class: "klein" }, meta.join(" · ")))
     );
+    card.style.setProperty("--i", String(nr || 0));
     return card;
+  }
+
+  // Schritte, solange noch kein Ergebnis möglich ist: zeigt, was als Nächstes fehlt.
+  function leerHinweis() {
+    function schritt(nr, text, fertig) {
+      return h("li", { class: "schritt" + (fertig ? " fertig" : "") },
+        h("span", { class: "nr", "aria-hidden": "true" }, fertig ? "✓" : String(nr)), h("span", null, text));
+    }
+    return h("div", { class: "leer" },
+      h("ol", { class: "schritte" },
+        schritt(1, "Standort des Rettungsdienstes eingeben oder auf der Karte anklicken", !!state.standort),
+        schritt(2, "Fallprofil wählen", !!state.profilId)),
+      h("p", { class: "klein" }, "Danach erscheinen UKHD als Vergleich und alle nach Liste geeigneten Häuser in ähnlicher Entfernung."));
+  }
+
+  function platzhalter() {
+    var box = h("div", { class: "skelette", "aria-hidden": "true" });
+    for (var i = 0; i < 3; i++) box.appendChild(h("div", { class: "skelett" }, h("i"), h("i"), h("i")));
+    return box;
   }
 
   function render() {
@@ -420,18 +489,19 @@
     markerLayer.clearLayers();
 
     if (!state.standort) {
-      box.appendChild(h("p", null, "Standort eingeben oder auf der Karte anklicken."));
+      box.appendChild(leerHinweis());
       zeichneNeutral();
       return;
     }
     if (state.laedt) {
-      box.appendChild(h("p", null, "Fahrzeiten werden berechnet …"));
+      box.appendChild(h("p", { class: "laedt" }, "Fahrzeiten werden berechnet …"));
+      box.appendChild(platzhalter());
       zeichneRouten(null);
       zeichneNeutral();
       return;
     }
     if (!state.profilId) {
-      box.appendChild(h("p", null, "Fallprofil wählen, um geeignete Häuser zu sehen."));
+      box.appendChild(leerHinweis());
       zeichneRouten(null);
       zeichneNeutral();
       return;
@@ -444,22 +514,31 @@
     var nahUnbekannt = r.liste.filter(function (e) { return e.kategorie === "nicht_geeignet" && e.eignung.hatUnbekannt && e.distanzOk === true; }).length;
 
     box.appendChild(h("div", { class: "kopfzeile " + (r.keineAlternative ? "keine" : "gut") },
-      r.keineAlternative
-        ? "In der Liste keine geeignete Alternative, UKHD."
-        : n + (n === 1 ? " Haus" : " Häuser") + " nach Liste geeignet und höchstens +" + state.schwelleX + " Min zu UKHD"));
+      h("span", { class: "grosszahl", "aria-hidden": "true" }, r.keineAlternative ? "H" : String(n)),
+      h("div", null,
+        h("div", { class: "kopf-titel" }, r.keineAlternative
+          ? "In der Liste keine geeignete Alternative, UKHD."
+          : n + (n === 1 ? " Haus" : " Häuser") + " nach Liste geeignet"),
+        h("div", { class: "kopf-unter" }, r.keineAlternative
+          ? "Kein Haus erfüllt das Profil und liegt höchstens +" + state.schwelleX + " Min über UKHD."
+          : "höchstens +" + state.schwelleX + " Min Mehrzeit gegenüber UKHD"))));
     box.appendChild(h("div", { class: "telefon" }, "Freie Kapazität und Aufnahmebereitschaft immer telefonisch beim Haus erfragen."));
     if (nahUnbekannt) box.appendChild(h("p", { class: "klein" },
       nahUnbekannt + (nahUnbekannt === 1 ? " nahes Haus" : " nahe Häuser") + " mit unbekannten Angaben (gelb markiert) " + (nahUnbekannt === 1 ? "wird" : "werden") + " nicht berücksichtigt."));
 
-    var rang = 0, weitere = [];
+    var gezeigt = r.liste.filter(function (e) { return e.kategorie === "referenz" || e.kategorie === "alternative"; });
+    var skala = gezeigt.reduce(function (m, e) { return e.minuten !== null && e.minuten > m ? e.minuten : m; }, 0) * 1.08;
+    var hdMin = r.hd && r.hd.minuten !== null ? r.hd.minuten : null;
+    var rang = 0, weitere = [], nr = 0;
     r.liste.forEach(function (e) {
       if (e.kategorie === "referenz" || e.kategorie === "alternative") {
-        box.appendChild(ergebnisKarte(e, e.kategorie === "alternative" ? ++rang : 0));
+        box.appendChild(ergebnisKarte(e, e.kategorie === "alternative" ? ++rang : 0, skala, hdMin, nr++));
       } else weitere.push(e);
     });
     if (weitere.length) {
       var det = h("details", { class: "weitere" }, h("summary", null, "Weitere Häuser (" + weitere.length + ") mit Grund"));
-      weitere.forEach(function (e) { det.appendChild(ergebnisKarte(e, 0)); });
+      var skalaWeit = weitere.reduce(function (m, e) { return e.minuten !== null && e.minuten > m ? e.minuten : m; }, skala) * 1.02;
+      weitere.forEach(function (e) { det.appendChild(ergebnisKarte(e, 0, skalaWeit, hdMin, 0)); });
       box.appendChild(det);
     }
 
@@ -547,12 +626,13 @@
   var INFO_HTML =
     "<h3>Wofür das Tool da ist</h3><p>Es zeigt, welche Häuser der hinterlegten Liste für das gewählte Fallprofil geeignet sind und höchstens die eingestellte Mehrzeit über der Fahrzeit nach Heidelberg liegen. Es ist eine Entscheidungshilfe. Die Zielklinik bestimmen Notarzt und Leitstelle.</p>" +
     "<h3>Was das Tool nicht weiß</h3><ul><li>Keine Live-Kapazitäten und keine Bettenlage. Freie Kapazität und Aufnahmebereitschaft müssen immer telefonisch beim Haus erfragt werden.</li><li>Fahrzeiten sind Pkw-Richtwerte ohne Sonderrechte und ohne aktuelle Verkehrslage.</li><li>Eine Angabe, die in der Liste fehlt, gilt als \"unbekannt\" und zählt nicht als geeignet.</li></ul>" +
+    "<h3>Listenprüfung</h3><p>Der Reiter „Listenprüfung“ zeigt, welche Angaben je Haus belegt sind und welche fehlen, und welche Fallprofile nur wegen einer Lücke ausfallen. Er dient der fachlichen Abnahme und der Planung von Rückfragen. Er verändert die Liste nicht.</p>" +
     "<h3>Datenschutz</h3><ul>" +
     "<li><b>Adresssuche (Nominatim/OpenStreetMap):</b> nur Straße und Ort, nie Hausnummer. Zusätzlich sieht der Dienst technisch die IP-Adresse des Rechners.</li>" +
     "<li><b>Fahrzeiten (OSRM/OpenStreetMap):</b> Koordinaten des Standorts und der Kliniken, keine Namen, keine Patientendaten.</li>" +
     "<li><b>Kartenkacheln (OpenStreetMap):</b> der sichtbare Kartenausschnitt.</li>" +
     "<li><b>Diese Seite (GitHub Pages):</b> beim Laden sieht GitHub die IP-Adresse des Rechners.</li>" +
-    "<li><b>Gespeichert wird nichts über Einsätze.</b> Standort, Profil und Eingaben bleiben im Arbeitsspeicher und verschwinden beim Neuladen. Nur eine selbst geladene Klinikliste bleibt im Browser.</li>" +
+    "<li><b>Gespeichert wird nichts über Einsätze.</b> Standort, Profil und Eingaben bleiben im Arbeitsspeicher und verschwinden beim Neuladen. Im Browser bleiben nur die Wahl hell oder dunkel und eine selbst geladene Klinikliste.</li>" +
     "<li>Keine Cookies, keine Statistik, keine Schlüssel in der Seite.</li></ul>" +
     "<h3>Quellen und Lizenzen</h3><p>Kartendaten © OpenStreetMap-Mitwirkende (ODbL). Karten-Bibliothek Leaflet (BSD-2). Anschlussstellen aus OpenStreetMap. Version " + APP_VERSION + ".</p>";
 
@@ -588,6 +668,14 @@
     $("routenKnopf").addEventListener("click", schalteRouten);
     aktualisiereRoutenKnopf();
 
+    $("navKarte").addEventListener("click", function () { zeigeAnsicht("karte", true); });
+    $("navPruefung").addEventListener("click", function () { zeigeAnsicht("pruefung", true); });
+    window.addEventListener("hashchange", function () { zeigeAnsicht(location.hash === "#pruefung" ? "pruefung" : "karte", false); });
+    $("themeKnopf").addEventListener("click", function () { window.CPUTheme.umschalten(); });
+    window.addEventListener("cpu-theme", function () {
+      if (state.ansicht === "karte" && state.routen) zeichneRouten(aktuelleRoutenziele());
+    });
+
     $("uhrzeit").value = lokalIso(new Date());
     aktualisiereUhrHinweis();
     setInterval(function () {
@@ -603,7 +691,10 @@
       }),
       fetchMitTimeout("data/anschlussstellen.json", TIMEOUT_MS).then(function (d) { state.anschlussstellen = d.anschlussstellen || []; })
         .catch(function () { meldung("as", "Anschlussstellen-Tabelle nicht ladbar: Autobahn-Eingabe ist nicht verfügbar.", "gelb"); })
-    ]).then(function () { render(); $("standort").focus(); })
+    ]).then(function () {
+      render();
+      if (location.hash === "#pruefung") zeigeAnsicht("pruefung", false); else $("standort").focus();
+    })
       .catch(function (e) { meldung("liste", "Klinikliste nicht ladbar: " + e.message, "rot"); });
 
     registriereServiceWorker();

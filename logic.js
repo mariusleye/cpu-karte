@@ -449,6 +449,60 @@
     return { aeltest: aeltest ? ymd(aeltest) : null, tage: tage, ohneStand: ohne };
   }
 
+  // --------------------------------------------------------------- Lückenanalyse
+
+  /**
+   * Für die Prüfansicht: je Haus der Status aller Felder (ja, nein, unbekannt), dazu die Fallprofile, die nur
+   * wegen einer Lücke ausfallen (kein Feld belegt "nein", mindestens eines unbekannt). Das zeigt, welche
+   * Rückfrage beim Haus sich lohnt. Die Katheterzeiten zählen als unbekannt, wenn sie fehlen oder unlesbar sind.
+   */
+  function luecken(kliniken, jetzt) {
+    var spalten = [{ key: "katheter", label: "Herzkatheter" }].concat(FELDER.map(function (f) { return { key: f.key, label: f.label }; }));
+    var proFeld = {}, proProfil = {};
+    spalten.forEach(function (s) { proFeld[s.key] = 0; });
+    PROFILE.forEach(function (p) { proProfil[p.id] = 0; });
+    var zellenGesamt = 0, zellenUnbekannt = 0, geprueft = 0, mitLuecken = 0;
+
+    var haeuser = kliniken.map(function (k) {
+      var z = k._zeiten !== undefined ? k._zeiten : parseZeiten(k.katheter);
+      var zellen = spalten.map(function (s) {
+        var status, text = "";
+        if (s.key === "katheter") {
+          if (!z || z.typ === "fehler") { status = "unbekannt"; text = z ? "nicht lesbar: " + z.text : ""; }
+          else if (z.typ === "keine") { status = "nein"; text = "kein Katheter"; }
+          else { status = "ja"; text = z.text; }
+        } else {
+          var v = k[s.key];
+          status = v === true ? "ja" : v === false ? "nein" : "unbekannt";
+        }
+        zellenGesamt++;
+        if (status === "unbekannt") { zellenUnbekannt++; proFeld[s.key]++; }
+        return { key: s.key, label: s.label, status: status, text: text };
+      });
+      var fehlend = zellen.filter(function (c) { return c.status === "unbekannt"; });
+      var blockiert = [];
+      PROFILE.forEach(function (p) {
+        var e = pruefeKlinik(k, p.id, jetzt);
+        var hatNein = e.gruende.some(function (g) { return g.status === "nein"; });
+        if (!e.geeignet && e.hatUnbekannt && !hatNein) { blockiert.push(p.id); proProfil[p.id]++; }
+      });
+      var dat = /^\d{4}-\d{2}-\d{2}$/.test(k.stand) ? new Date(k.stand + "T12:00:00") : null;
+      var tage = dat && !isNaN(dat) ? Math.floor((jetzt - dat) / 86400000) : null;
+      if (k.geprueft) geprueft++;
+      if (fehlend.length) mitLuecken++;
+      return { klinik: k, zellen: zellen, fehlend: fehlend, blockiert: blockiert, tage: tage, geprueft: !!k.geprueft };
+    });
+
+    return {
+      haeuser: haeuser, spalten: spalten, proFeld: proFeld, proProfil: proProfil,
+      zusammenfassung: {
+        haeuser: kliniken.length, mitLuecken: mitLuecken, geprueft: geprueft,
+        zellenGesamt: zellenGesamt, zellenUnbekannt: zellenUnbekannt,
+        anteilBekannt: zellenGesamt ? 1 - zellenUnbekannt / zellenGesamt : 0
+      }
+    };
+  }
+
   return {
     FELDER: FELDER, PROFILE: PROFILE, ANFORDERUNG_LABEL: ANFORDERUNG_LABEL,
     profil: profil, feiertageBW: feiertageBW, istFeiertag: istFeiertag,
@@ -457,7 +511,7 @@
     haversineKm: haversineKm, schaetzeMinuten: schaetzeMinuten,
     bereinigeAdresse: bereinigeAdresse, parseAutobahn: parseAutobahn, sucheAnschlussstellen: sucheAnschlussstellen,
     normalisiereKlinik: normalisiereKlinik, pruefeListe: pruefeListe,
-    klinikenAusTabelle: klinikenAusTabelle, standDerListe: standDerListe,
+    klinikenAusTabelle: klinikenAusTabelle, standDerListe: standDerListe, luecken: luecken,
     ymd: ymd
   };
 });
