@@ -70,3 +70,11 @@ Hinweis zur Vollständigkeit: Die Liste der Heidelberger Häuser stammt aus dem 
 
 - Aufgenommen: St. Josefskrankenhaus Heidelberg und Thoraxklinik Heidelberg (dort Notaufnahme auf leer gesetzt, weil die direkte Aufnahme durch den Rettungsdienst nicht ausdrücklich belegt ist).
 - Nicht aufgenommen: SRH Kurpfalzkrankenhaus Heidelberg (keine eigene Notaufnahme beschrieben, Aufnahme nur per Verlegung oder Einweisung über den Dienstarzt). Der Eintrag aus der Recherche steht in `data/ov-heidelberg.json` (lokal, nicht veröffentlicht) und kann bei Bedarf in die Excel übernommen werden.
+
+## Nachprüfung (01.11.2026)
+
+- St. Josefskrankenhaus: Pressetext (Okt. 2024) und Notaufnahmeseite bestätigen Zentrale Notaufnahme 24/7 mit Katheterlabor in unmittelbarer Nähe, nennen aber keine Katheterzeiten. Qualitätsbericht 2024 bleibt bei "Notfallverfügbarkeit 24h: Nein". Katheter weiter leer, Telefonklärung nötig (Kardiologie 06221 526-777, Notaufnahme 06221 526-888).
+- Bethanien Krankenhaus: Ein Verzeichnis (notdienstradar.de) führt es mit "24/7 Notaufnahme". Die eigene Notfallseite des Hauses nennt keine Notaufnahme, sondern verweist auf Notfallambulanz UKHD und St. Josefskrankenhaus. Bleibt ausgeschlossen.
+- SRH Kurpfalzkrankenhaus: Herzkatheter laut Fachabteilungsseite weiter am UKHD ("in der Medizinischen Klinik Heidelberg durchführen"). Bleibt ausgeschlossen.
+- Klinik Salem: Notaufnahme zum 30.06.2026 geschlossen, Standort des UKHD, mehrere Meldungen bestätigen es. Bleibt ausgeschlossen.
+- Thoraxklinik: keine neuen Angaben gefunden; die Website der Klinik ließ sich in diesem Lauf nicht abrufen (Zugriffssperre).
